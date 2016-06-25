@@ -16,6 +16,7 @@ var DB_SCHEMA_FILENAME = "amazoon.sql";
 
 var dbSchema = fs.readFileSync(DB_SCHEMA_FILENAME,{ encoding: "utf-8" });
 var db = new sqlite3.Database(DB_FILENAME,onConnected);
+// var utils = require('./helpers.js')
 
 //
 // TODO: print some help text to let the CLI user know how to
@@ -32,63 +33,19 @@ function onConnected(err) {
 		return;
 	}
 
-	// This sets database to serialized mode, which causes
-	// the library to run each query sequentially
-	// (as opposed to running them all in parallel).
 	db.serialize();
+	db.exec( dbSchema );
 
-	//
-	// TODO: 3 steps to take, all asynchronous:
-	//
+  parseCSV(function(order) {
 
-	// 1. Initialize database schema
-	//    For example: db.exec( dbSchema )
-		db.exec( dbSchema );
+		addOrder(order);
+		addCustomer(order);
+		addProduct(order);
 
-	// 2. Parse the CSV
-	//    The `parseCSV` function will be helpful;
-	//		it should return useful objects / arrays.
-	//	  Feel free to modify the code as you need to.
+	});
 
-    parseCSV(function(orders) {
-			orders.forEach(function(order) {
-				var total = 0;
-				for (var i = 1; i <= 3; i++) {
-					total +=
-					order[`Product ${i} Unit Price`] *
-					order[`Product ${i} Qty`]
-				}
 
-      // insert into orders ($) values ($)
-				// var ordId = order['Order ID']; // ABC
-			  db.run("INSERT into orders
-				(
-					customer_id,
-					order_id,
-					order_date,
-					order_status,
-					order_total
-				)
-				values (
-						$customer_id,
-						$orderId,
-						$orderDate,
-						$orderStatus,
-						$orderTotal
-				)",
-				{
-					$customer_id: order['Customer ID'],
-					$orderId: order['Order ID'],
-					$orderDate: order['Order Date'],
-					$orderStatus: order['Order Status'],
-					$orderTotal: total
 
-				}, function(err) {
-					console.log(err);
-				});
-				
-			});
-		});
 	// 3. Insert the data into your SQL database.
 	//    Tips:
 	//
@@ -116,15 +73,60 @@ function parseCSV(cb) {
 	});
 
 	file.pipe(parser);
-  var rows = [];
 	parser.on("readable",function(){
 		var record;
+
 		while (record = parser.read()) {
-			//
-			// `record` is an object representing a row of the CSV file.
-			//  Console log it to see what it looks like.
-			rows.push(record);
+			cb(record);
 		}
-		cb(rows);
 	});
+}
+
+function addCustomer (order){
+  db.run("INSERT OR IGNORE into customers (customer_id, customer_name, customer_email) values($customer_id, $customer_name, $customer_email)",
+  {
+    $customer_id: order["Customer ID"],
+    $customer_name: order["Customer Name"],
+    $customer_email: order["Customer Email"]
+  },
+  function(err){
+    if (err) console.error(err);
+  });
+}
+
+function addOrder (order){
+  var total = 0;
+  for (var i = 1; i <= 3; i++) {
+    total +=
+    order[`Product ${i} Unit Price`] *
+    order[`Product ${i} Qty`]
+  }
+
+
+  db.run("INSERT into orders (customer_id,order_id,order_date,order_status,order_total) values ($customer_id,$orderId,$orderDate,$orderStatus,$orderTotal)",
+  {
+    // $customer_id: order['Customer ID'],
+    $orderId: order['Order ID'],
+    $orderDate: order['Order Date'],
+    $orderStatus: order['Order Status'],
+    $orderTotal: total
+
+  }, function(err) {
+    if (err) console.error(err);
+    // console.log("woohoo!");
+  });
+
+}
+
+function addProduct (order){
+  for (var i = 1; i <= 3; i++) {
+    db.run("INSERT OR IGNORE into products (product_id, product_label, unit_price) values ($product_id, $product_label, $unit_price)",
+    {
+      $product_id: order[`Product ${i} ID`],
+      $product_label: order[`Product ${i} Label`],
+      $unit_price: order[`Product ${i} Unit Price`]
+    }), function(err) {
+      if (err) console.error(err);
+    }
+  }
 }

@@ -2,7 +2,7 @@ PRAGMA foreign_keys = ON;
 
 CREATE TABLE IF NOT EXISTS customers(
   id INTEGER PRIMARY KEY ASC,
-  customer_id char(10),
+  customer_id char(10) UNIQUE,
   customer_name char(50),
   customer_email char(50)
 );
@@ -19,7 +19,7 @@ CREATE TABLE IF NOT EXISTS orders(
 
 CREATE TABLE IF NOT EXISTS products(
   id INTEGER PRIMARY KEY ASC,
-  product_id int,
+  product_id int UNIQUE,
   product_label char(50),
   unit_price number(3,2)
 );
