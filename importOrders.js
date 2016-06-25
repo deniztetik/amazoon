@@ -25,6 +25,8 @@ var db = new sqlite3.Database(DB_FILENAME,onConnected);
 // ************************************
 
 function onConnected(err) {
+	var orders = [];
+
 	if (err) {
 		console.log("Database connection error.",err.toString());
 		return;
@@ -41,12 +43,52 @@ function onConnected(err) {
 
 	// 1. Initialize database schema
 	//    For example: db.exec( dbSchema )
+		db.exec( dbSchema );
 
 	// 2. Parse the CSV
 	//    The `parseCSV` function will be helpful;
 	//		it should return useful objects / arrays.
 	//	  Feel free to modify the code as you need to.
 
+    parseCSV(function(orders) {
+			orders.forEach(function(order) {
+				var total = 0;
+				for (var i = 1; i <= 3; i++) {
+					total +=
+					order[`Product ${i} Unit Price`] *
+					order[`Product ${i} Qty`]
+				}
+
+      // insert into orders ($) values ($)
+				// var ordId = order['Order ID']; // ABC
+			  db.run("INSERT into orders
+				(
+					customer_id,
+					order_id,
+					order_date,
+					order_status,
+					order_total
+				)
+				values (
+						$customer_id,
+						$orderId,
+						$orderDate,
+						$orderStatus,
+						$orderTotal
+				)",
+				{
+					$customer_id: order['Customer ID'],
+					$orderId: order['Order ID'],
+					$orderDate: order['Order Date'],
+					$orderStatus: order['Order Status'],
+					$orderTotal: total
+
+				}, function(err) {
+					console.log(err);
+				});
+				
+			});
+		});
 	// 3. Insert the data into your SQL database.
 	//    Tips:
 	//
@@ -66,7 +108,7 @@ function onConnected(err) {
 	//    })
 }
 
-function parseCSV() {
+function parseCSV(cb) {
 	var file = fs.createReadStream(ORDERS_FILENAME);
 	var parser = csv.parse({
 		columns: true,
@@ -74,14 +116,15 @@ function parseCSV() {
 	});
 
 	file.pipe(parser);
-
+  var rows = [];
 	parser.on("readable",function(){
 		var record;
 		while (record = parser.read()) {
 			//
 			// `record` is an object representing a row of the CSV file.
 			//  Console log it to see what it looks like.
-			//
+			rows.push(record);
 		}
+		cb(rows);
 	});
 }
